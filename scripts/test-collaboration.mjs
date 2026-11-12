@@ -1,0 +1,27 @@
+import assert from "node:assert/strict";
+const base=new URL(process.argv[2]??"http://127.0.0.1:5181");
+if(!["127.0.0.1","localhost","[::1]"].includes(base.hostname))throw Error("只允许运行在隔离本地预览");
+const login=await fetch(new URL("/signin-with-chatgpt?return_to=/",base),{redirect:"manual"});
+const cookie=login.headers.getSetCookie().map(s=>s.split(";")[0]).join("; ");
+assert.ok(cookie,"需要Sites本地模拟登录");
+const call=async(route,method="GET",body,auth=true)=>{
+  const response=await fetch(new URL(route,base),{method,headers:{"content-type":"application/json",...(auth?{cookie}:{})},body:body?JSON.stringify(body):undefined});
+  return {status:response.status,data:await response.json()};
+};
+assert.equal((await call("/api/issues","GET",undefined,false)).status,401);
+const id="module-c-issue-1",route="/api/issues/"+id;
+let latest=(await call("/api/issues")).data.states[id]??{revision:0,description:"初始模拟",handlingNote:"",repaired:false,confirmed:false};
+const payload=(changes={})=>({description:latest.description,handlingNote:latest.handlingNote,repaired:latest.repaired,confirmed:latest.confirmed,expectedRevision:latest.revision,...changes});
+const initialRevision=latest.revision;
+let result=await call(route,"PATCH",payload({repaired:true,confirmed:false}));assert.equal(result.status,200);latest=result.data.state;
+assert.equal(latest.repaired,true);assert.equal(latest.confirmed,false);
+const stale=await call(route,"PATCH",payload({expectedRevision:initialRevision,handlingNote:"不应覆盖"}));assert.equal(stale.status,409);
+result=await call(route,"PATCH",payload({confirmed:true}));assert.equal(result.status,200);latest=result.data.state;assert.equal(latest.repaired,true);
+result=await call(route,"PATCH",payload({repaired:false}));latest=result.data.state;assert.equal(latest.confirmed,true);
+result=await call(route,"PATCH",payload({description:"模拟修改后的描述",handlingNote:"模拟研发备注"}));assert.equal(result.status,200);latest=result.data.state;
+const pair=await Promise.all([call(route,"PATCH",payload({handlingNote:"并发A"})),call(route,"PATCH",payload({handlingNote:"并发B"}))]);
+assert.deepEqual(pair.map(x=>x.status).sort(),[200,409]);
+const history=(await call(route+"/history")).data.history;
+assert.ok(history.length>=5);assert.ok(history.every(h=>h.actorEmail&&h.changedAt&&h.before&&h.after));
+assert.equal((await call("/api/issues/not-exist","PATCH",payload())).status,404);
+console.log(JSON.stringify({ok:true,checks:["unauthenticated rejected","independent states","uncheck retains other state","description and note save","stale revision conflict","concurrent write conflict","history includes actor/time/before/after","unknown issue rejected"],identity:"Sites local simulated user only; real cross-account access not tested"}));

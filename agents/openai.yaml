@@ -1,0 +1,4 @@
+interface:
+  display_name: "PC 端设计验收"
+  short_description: "对照 Figma 参数与开发页面验收 PC 视觉还原，汇总可协作报告"
+  default_prompt: "请使用 $pc-design-qa 帮我验收 PC 页面。首次使用时请用我能理解的方式逐步引导准备，已有配置时只问本次缺少的信息。"

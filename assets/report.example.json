@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "version": "填写版本号",
+  "requirement": "填写需求名",
+  "onlineUrl": "",
+  "batches": {
+    "batch-01": {
+      "tab": "填写模块分组名",
+      "title": "填写模块分组名",
+      "source": "填写开发环境与位置",
+      "link": "",
+      "modules": [],
+      "pending": []
+    }
+  }
+}
